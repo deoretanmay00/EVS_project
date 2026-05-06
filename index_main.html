@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Smart Dustbin Dashboard</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+body {
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    background: #eef1f7;
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1f3c88;
+    padding: 15px 25px;
+    color: white;
+    font-size: 22px;
+}
+
+.dropdown { position: relative; }
+
+.dropdown button {
+    background: white;
+    color: #1f3c88;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    background: white;
+    min-width: 300px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.dropdown-content div {
+    padding: 12px;
+    cursor: pointer;
+    color: #333;
+}
+
+.dropdown-content div:hover {
+    background: #f0f3ff;
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+.panel {
+    display: none;
+    background: white;
+    margin: 20px auto;
+    padding: 20px;
+    width: 90%;
+    border-radius: 12px;
+}
+
+input, select {
+    display: block;
+    padding: 10px;
+    margin: 8px 0;
+    width: 250px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+.btn {
+    padding: 10px 15px;
+    background: #1f3c88;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.card-container {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    width: 200px;
+    text-align: center;
+    border-radius: 12px;
+}
+
+.table-container {
+    width: 90%;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+table { width: 100%; border-collapse: collapse; }
+
+th {
+    background: #1f3c88;
+    color: white;
+    padding: 10px;
+}
+
+td {
+    padding: 10px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+}
+
+.badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    color: white;
+}
+
+.full { background: red; }
+.empty { background: green; }
+
+.refresh-btn {
+    margin-top: 15px;
+    padding: 10px 20px;
+    background: #1f3c88;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+    Smart Dustbin Monitoring Dashboard
+
+    <div class="dropdown">
+        <button>⚙️ Manage</button>
+        <div class="dropdown-content">
+            <div onclick="showPanel('add')">➕ Add Dustbin</div>
+            <div onclick="showPanel('delete')">❌ Delete Dustbin</div>
+            <div onclick="showPanel('name')">✏️ Update Name</div>
+            <div onclick="showPanel('coords')">📍 Update Coordinates</div>
+            <div onclick="showPanel('status')">🔄 Update Status</div>
+        </div>
+    </div>
+</div>
+
+<div id="panel" class="panel"></div>
+
+<div class="card-container">
+    <div class="card"><h3>Total</h3><h2 id="totalBins">0</h2></div>
+    <div class="card"><h3>Full</h3><h2 id="fullBins">0</h2></div>
+    <div class="card"><h3>Empty</h3><h2 id="emptyBins">0</h2></div>
+</div>
+
+<div class="table-container">
+    <h2>Dustbin Details</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Location</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Status</th>
+                <th>Updated</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+
+    <center>
+        <button class="refresh-btn" onclick="load()">🔄 Refresh Data</button>
+    </center>
+</div>
+
+<script>
+const BASE_URL = "http://10.198.91.202:3000";
+
+// PANEL
+function showPanel(type) {
+    const panel = document.getElementById("panel");
+    panel.style.display = "block";
+
+    if (type === "add") {
+        panel.innerHTML = `
+        <h3>Add Dustbin</h3>
+        <input id="id" placeholder="Enter unique ID">
+        <input id="location_name" placeholder="Location (letters only)">
+        <input id="lat" placeholder="Latitude">
+        <input id="lng" placeholder="Longitude">
+        <select id="status">
+            <option value="0">Empty</option>
+            <option value="1">Full</option>
+        </select>
+        <button class="btn" onclick="add()">Add</button>`;
+    }
+
+    if (type === "delete") {
+        panel.innerHTML = `
+        <h3>Delete Dustbin</h3>
+        <input id="id" placeholder="Enter ID">
+        <button class="btn" onclick="deleteBin()">Delete</button>`;
+    }
+
+    if (type === "name") {
+        panel.innerHTML = `
+        <h3>Update Location Name</h3>
+        <input id="id" placeholder="Enter ID">
+        <input id="location_name" placeholder="New location (letters only)">
+        <button class="btn" onclick="updateName()">Update</button>`;
+    }
+
+    if (type === "coords") {
+        panel.innerHTML = `
+        <h3>Update Coordinates</h3>
+        <input id="id" placeholder="Enter ID">
+        <input id="lat" placeholder="Latitude">
+        <input id="lng" placeholder="Longitude">
+        <button class="btn" onclick="updateCoords()">Update</button>`;
+    }
+
+    if (type === "status") {
+        panel.innerHTML = `
+        <h3>Update Status</h3>
+        <input id="id" placeholder="Enter ID">
+        <select id="status">
+            <option value="1">Full</option>
+            <option value="0">Empty</option>
+        </select>
+        <button class="btn" onclick="updateStatus()">Update</button>`;
+    }
+}
+
+// ADD (WITH VALIDATION)
+function add() {
+    const idVal = +id.value;
+    const loc = location_name.value.trim();
+    const latVal = +lat.value;
+    const lngVal = +lng.value;
+    const statusVal = +status.value;
+
+    if (!loc) return alert("Location cannot be empty");
+    if (!isNaN(loc)) return alert("Please enter location in the text form. Numbers are not allowed.");
+    if (!/^[a-zA-Z0-9\s]+$/.test(loc)) return alert("Only letters allowed");
+
+    if (isNaN(latVal) || isNaN(lngVal)) {
+        return alert("Latitude & Longitude must be numbers. Letters are not allowed");
+    }
+
+    fetch(BASE_URL+"/bins", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+            id:idVal,
+            location_name:loc,
+            latitude:latVal,
+            longitude:lngVal,
+            is_full:statusVal
+        })
+    }).then(r=>r.text()).then(alert).then(load);
+}
+
+// DELETE
+function deleteBin() {
+    fetch(BASE_URL+"/bins", {
+        method:"DELETE",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ id:+id.value })
+    }).then(r=>r.text()).then(alert).then(load);
+}
+
+// UPDATE NAME (WITH VALIDATION)
+function updateName() {
+    const idVal = +id.value;
+    const loc = location_name.value.trim();
+
+    if (!loc) return alert("Location cannot be empty");
+    if (!isNaN(loc)) return alert("Location must be text");
+    if (!/^[a-zA-Z0-9\s]+$/.test(loc)) return alert("Only letters allowed");
+
+    fetch(BASE_URL+"/location", {
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ id:idVal, location_name:loc })
+    }).then(r=>r.text()).then(alert).then(load);
+}
+
+// UPDATE COORDS
+function updateCoords() {
+    fetch(BASE_URL+"/coords", {
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+            id:+id.value,
+            latitude:+lat.value,
+            longitude:+lng.value
+        })
+    }).then(r=>r.text()).then(alert).then(load);
+}
+
+// UPDATE STATUS
+function updateStatus() { 
+    fetch(BASE_URL+"/update", { 
+        method:"POST", 
+        headers:{"Content-Type":"application/json"}, 
+        body: JSON.stringify({ 
+            id: Number(document.getElementById("id").value), 
+            is_full: Number(document.getElementById("status").value) 
+        }) 
+    }) 
+    .then(r=>r.text()) 
+    .then(msg => { alert(msg); load(); }); 
+}
+
+// LOAD
+function load() {
+    fetch(BASE_URL+"/bins")
+    .then(r=>r.json())
+    .then(data=>{
+        let html="",full=0;
+        data.forEach(b=>{
+            if(b.is_full) full++;
+            html+=`<tr>
+                <td>${b.id}</td>
+                <td>${b.location_name}</td>
+                <td>${b.latitude}</td>
+                <td>${b.longitude}</td>
+                <td><span class="badge ${b.is_full?'full':'empty'}">${b.is_full?'FULL':'EMPTY'}</span></td>
+                <td>${new Date(b.last_updated).toLocaleString('en-GB')}</td>
+            </tr>`;
+        });
+        tableBody.innerHTML=html;
+        totalBins.innerText=data.length;
+        fullBins.innerText=full;
+        emptyBins.innerText=data.length-full;
+    });
+}
+
+load();
+</script>
+
+</body>
+</html>
